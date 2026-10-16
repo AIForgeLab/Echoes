@@ -35,7 +35,7 @@ export function useEchoActions(after?: () => void) {
         }
       }}>
       <p>Echoes will delete every summary, tag and claim made from this memory, then destroy its encryption key. The encrypted text that remains can never be read again, and a tombstone records that something was here.</p>
-      <p>Limits: {data.mode === 'demo' ? 'in demo mode this happens in your browser storage.' : 'database backups made before today may still hold the encrypted text, but without the key it is unreadable. Text you sent to the AI service may be kept by that provider under its own retention policy.'}</p>
+      <p>Limits: {data.mode === 'demo' ? 'in demo mode this happens in your browser storage.' : "a database backup made before now holds both this memory's key and its encrypted text, so it can still be read from that backup until the backup is deleted. Text you sent to the AI service may be kept by that provider under its own retention policy."}</p>
     </ConfirmDialog>
   )
 

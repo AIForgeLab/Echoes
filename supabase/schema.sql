@@ -56,7 +56,8 @@ create table if not exists tags (
   primary key (memory_id, tag)
 );
 
--- Per-memory keys, kept apart from the ciphertext. Deleting the row = crypto-shredding.
+-- Per-memory keys, kept apart from the ciphertext. Deleting the row = crypto-shredding of the live data.
+-- Note: database backups taken before a forget still contain the key, so they stay readable until they expire.
 create table if not exists memory_keys (
   memory_id uuid primary key references memories on delete cascade,
   user_id   uuid not null default auth.uid() references auth.users on delete cascade,

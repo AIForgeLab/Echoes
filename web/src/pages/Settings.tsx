@@ -109,7 +109,9 @@ export default function Settings() {
         </div>
         <div className="text-sm text-muted space-y-1.5">
           <p><strong className="text-ivory">What forgetting does:</strong> deletes summaries, tags and extracted facts, then destroys the memory's encryption key. The remaining ciphertext can never be decrypted, and a tombstone records that something was forgotten.</p>
-          <p><strong className="text-ivory">Limits:</strong> database backups made earlier may still contain the encrypted text (unreadable without the key). Text already sent to the AI provider is covered by that provider's own retention policy, which Echoes cannot control.</p>
+          <p><strong className="text-ivory">Limits:</strong> {data.mode === 'live'
+            ? "each key is stored in the same database as the encrypted text, in a separate access-controlled table. A database backup made before you forget a memory holds both, so that memory can still be read from the backup until the backup is deleted under your database provider's retention schedule."
+            : "in demo mode everything lives in this browser's storage, and Echoes keeps no other copies."} Text already sent to the AI provider is covered by that provider's own retention policy, which Echoes cannot control.</p>
           <p><strong className="text-ivory">Deleting your account</strong> requires a server-side action that this app doesn't include yet. {data.mode === 'live' ? 'Forget all memories first, then ask the project owner to remove the account in Supabase.' : 'In demo mode, clearing this site\'s browser data removes everything.'}</p>
         </div>
       </Section>

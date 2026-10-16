@@ -87,11 +87,15 @@ runs a second entailment check, and the browser re-checks the quote again before
 ## Honest limits
 
 - **Demo mode** is single-browser storage with a local password check. It is not secure authentication.
-- **Encryption keys** are stored in a separate table from the ciphertext, protected by RLS. A future
-  version should wrap them with a key derived from the user's passphrase.
-- **Forgetting** makes the stored text unreadable, including in older backups (no key), but text
-  already sent to the AI provider follows that provider's retention policy. EU regulators still treat
-  encrypted data as personal data, so this is "unreadable", not a legal guarantee of erasure.
+- **Encryption keys** are stored in the same database as the ciphertext (a separate table, protected
+  by RLS). A future version should wrap each key with a key derived from the user's password, so the
+  server never holds a usable key.
+- **Forgetting** destroys the key in the live database, so the copy there becomes unreadable. It does
+  not reach older database backups: a backup made before you forgot a memory contains both the key and
+  the ciphertext, so the memory stays readable from that backup until the backup is deleted under the
+  database provider's retention schedule. Text already sent to the AI provider follows that provider's
+  retention policy. EU regulators still treat encrypted data as personal data, so this means
+  "unreadable in the live database", not a legal guarantee of erasure.
 - **A hash proves the text didn't change**, not that the memory is true.
 - **Account deletion** needs a server-side admin action that isn't included.
 - Chat conversations are kept for the browser session only.
