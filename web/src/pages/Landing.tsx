@@ -60,7 +60,7 @@ function TruthExample() {
         <div className="rounded-xl border border-[#5fbf8f]/40 bg-[#111110] p-4">
           <TruthBoundaryBadge type="said" />
           <p className="mt-2 text-[17px]">Your saved memory says you built a robot together.</p>
-          <p className="mt-2 border-l-2 border-[#5fbf8f]/60 pl-3 text-sm text-[#d9d1c3]">“I built my first robot with my father” · your words, quote verified</p>
+          <p className="mt-2 border-l-2 border-[#5fbf8f]/60 pl-3 text-sm text-[#d9d1c3]">“I built my first robot with my father” · found in your text by code; support checked by AI</p>
         </div>
         <div className="rounded-xl border border-[#f2b544]/40 bg-[#111110] p-4">
           <TruthBoundaryBadge type="unknown" />

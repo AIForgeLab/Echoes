@@ -32,7 +32,7 @@ function Answer({ r, onShow }: { r: AskResult; onShow: (s: { start: number; end:
           <p className="mt-2 text-[17px] leading-relaxed">{c.text}</p>
           {c.type === 'said' && c.quote && (
             <div className="mt-3">
-              <p className="text-sm text-muted"><span className="text-ivory/90">Source:</span> your words{c.verified ? ', quote verified' : ''}</p>
+              <p className="text-sm text-muted"><span className="text-ivory/90">Source:</span> your exact words, found in the memory by code{c.verified ? '; a second AI check judged that they support this' : ''}</p>
               <blockquote className="mt-2 border-l-2 border-emerald/60 bg-surface-2 rounded-r-lg px-3 py-2 text-sm text-ivory/90">“{c.quote}”</blockquote>
               {c.start != null && c.end != null && <button className="mt-2 text-sm text-gold hover:underline inline-flex items-center gap-1" onClick={() => onShow({ start: c.start!, end: c.end! })}><BookOpen size={14} />Show in the original</button>}
             </div>

@@ -127,7 +127,7 @@ export default function Settings() {
       <Section title="About" id="s-about">
         <p className="text-ivory">Echoes — The Living Memory Archive <span className="text-muted">· v{APP_VERSION}</span> {data.mode === 'demo' && <DemoLabel>Demo mode</DemoLabel>}</p>
         <p className="text-sm text-muted italic">Preserve the memory. Question the meaning. Verify the truth. Respect the right to forget.</p>
-        <p className="text-sm text-muted"><strong className="text-ivory">The Truth Boundary:</strong> every AI answer is split into what you actually wrote (source-backed, with the exact quote checked in code), what the AI infers (interpretation), and what your memory doesn't say (unknown). Leading questions are checked against your words before anything is answered.</p>
+        <p className="text-sm text-muted"><strong className="text-ivory">The Truth Boundary:</strong> every AI answer is split into what you actually wrote (source-backed: code confirms the exact quote is in your memory, and a second AI check judges that it supports the answer), what the AI infers (interpretation), and what your memory doesn't say (unknown). Leading questions are checked against your words before anything is answered.</p>
         <p className="text-xs text-muted">Built with React, Vite, Tailwind CSS, React Router, React Flow (@xyflow/react), Lucide icons, Supabase, Flask and Groq. Seal portraits follow Perrig &amp; Song's hash visualization (1999). Theatre view after Giulio Camillo's Theatre of Memory.</p>
       </Section>
 

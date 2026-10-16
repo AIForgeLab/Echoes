@@ -27,6 +27,9 @@ def extract(text, gen):
         if span:  # code decides: a claim without a real quote is dropped
             claims.append({"text": c.get("text", "").strip(), "quote": text[span[0]:span[1]],
                            "start": span[0], "end": span[1]})
+    # second check, as for answers: a fact is kept only if its quote, on its own, supports it
+    keep = _supported([{"id": i, "claim": c["text"], "quote": c["quote"]} for i, c in enumerate(claims)], gen)
+    claims = [c for i, c in enumerate(claims) if i in keep]
     category = out.get("category") if out.get("category") in CATEGORIES else "Personal"
     tags = sorted({str(t).strip().lower().lstrip("#") for t in out.get("tags", []) if str(t).strip()})[:6]
     return {"title": (out.get("title") or "Untitled echo").strip()[:60],
@@ -124,16 +127,23 @@ def answer(text, question, flagged, gen):
 
     # second check: does the quote actually support the claim?
     to_check = [{"id": i, "claim": c["text"], "quote": c["quote"]} for i, c in enumerate(claims) if c["type"] == "said"]
-    if to_check:
-        res = gen(ENTAIL_SYSTEM, json.dumps(to_check))
-        ok = {r.get("id"): bool(r.get("supports")) for r in res.get("results", [])}
-        for item in to_check:
-            c = claims[item["id"]]
-            if ok.get(item["id"]):
-                c["verified"] = True
-            else:
-                c["type"], c["note"] = "inferred", "demoted: quote does not support the claim"
+    ok = _supported(to_check, gen)
+    for item in to_check:
+        c = claims[item["id"]]
+        if item["id"] in ok:
+            c["verified"] = True
+        else:
+            c["type"], c["note"] = "inferred", "demoted: quote does not support the claim"
     return claims
+
+
+def _supported(items, gen):
+    """Entailment check by a second model call. items: [{id, claim, quote}] -> ids whose quote supports the claim.
+    This is model-judged, not proven: code only guarantees that each quote really is in the memory."""
+    if not items:
+        return set()
+    res = gen(ENTAIL_SYSTEM, json.dumps(items))
+    return {r.get("id") for r in res.get("results", []) if r.get("supports") is True}
 
 
 # ---------------------------------------------------------------- pentimento

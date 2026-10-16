@@ -108,7 +108,7 @@ function RoomPanel() {
         <div className="rounded-xl border border-[#5fbf8f]/40 bg-[#111110] p-3">
           <TruthBoundaryBadge type="said" />
           <p className="mt-2">It inspired you to become an engineer.</p>
-          <p className="mt-2 border-l-2 border-[#5fbf8f]/60 pl-2 text-xs text-[#d9d1c3]">“That day inspired me to become an engineer” · quote verified</p>
+          <p className="mt-2 border-l-2 border-[#5fbf8f]/60 pl-2 text-xs text-[#d9d1c3]">“That day inspired me to become an engineer” · found in your text; support checked by AI</p>
         </div>
         <p className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-[#2a3140] px-3.5 py-2">Was Dad proud when the robot won?</p>
         <div className="rounded-xl border border-[#f2b544]/50 bg-[#f2b544]/5 p-3">

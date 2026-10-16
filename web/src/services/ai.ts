@@ -20,7 +20,9 @@ export function aiStatus(): Promise<AiStatus> {
         const t = setTimeout(() => ctrl.abort(), 2500)
         const res = await fetch(`${API_URL}/health`, { signal: ctrl.signal })
         clearTimeout(t)
-        return res.ok ? 'live' : 'demo'
+        // a page host may answer 200 with HTML; only a real {ok: true} from the AI server counts
+        const body = res.ok ? await res.json().catch(() => null) : null
+        return body?.ok ? 'live' : 'demo'
       } catch {
         return 'demo'
       }

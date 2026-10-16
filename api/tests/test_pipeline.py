@@ -43,7 +43,8 @@ def test_extract_drops_claims_without_real_quotes():
         "claims": [
             {"text": "You built a robot with your father", "quote": "built my first robot with my father"},
             {"text": "The robot was red", "quote": "the red robot"},  # invented -> dropped
-        ]}])
+        ]},
+        {"results": [{"id": 0, "supports": True}]}])
     out = pipeline.extract(MEMORY, gen)
     assert [c["text"] for c in out["claims"]] == ["You built a robot with your father"]
     assert out["tags"] == ["father", "robot"]
@@ -133,3 +134,24 @@ def test_local_vectors_pair_a_single_shared_word():
     assert ("changed", old[5], new[6]) in pairs
     assert ("omitted", old[4], None) in pairs
     assert ("new", None, new[5]) in pairs
+
+
+def test_extract_drops_facts_whose_real_quote_does_not_support_them():
+    gen = fake_gen([
+        {"title": "Robot", "summary": "", "category": "Projects", "tags": [], "claims": [
+            {"text": "You built a robot with your father", "quote": "built my first robot with my father"},
+            {"text": "Your father was an engineer", "quote": "my father"},  # quote exists, but doesn't say that
+        ]},
+        {"results": [{"id": 0, "supports": True}, {"id": 1, "supports": False}]},
+    ])
+    out = pipeline.extract(MEMORY, gen)
+    assert [c["text"] for c in out["claims"]] == ["You built a robot with your father"]
+
+
+def test_extract_keeps_nothing_when_the_check_is_missing_or_unclear():
+    gen = fake_gen([
+        {"title": "Robot", "summary": "", "category": "Projects", "tags": [], "claims": [
+            {"text": "You built a robot", "quote": "built my first robot"}]},
+        {"results": [{"id": 0, "supports": "yes"}]},  # not a clear true: fail closed
+    ])
+    assert pipeline.extract(MEMORY, gen)["claims"] == []

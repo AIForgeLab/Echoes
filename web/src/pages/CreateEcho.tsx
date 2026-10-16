@@ -185,7 +185,7 @@ export default function CreateEcho() {
                   </div>
                   <div><p className="text-xs text-muted">Theme</p><p>{d.enhanced.category}</p></div>
                   <div><p className="text-xs text-muted mb-1">Tags</p><div className="flex flex-wrap gap-1.5">{d.enhanced.tags.map((t) => <TagChip key={t} tag={t} />)}</div></div>
-                  <p className="text-xs text-muted">{d.enhanced.claims.length} facts extracted, each tied to the exact words it came from.</p>
+                  <p className="text-xs text-muted">{d.enhanced.claims.length} facts extracted. Each one quotes your exact words (checked by code) and was judged by a second AI pass to follow from them.</p>
                 </div>
               )}
             </div>
