@@ -59,7 +59,7 @@ export default function ProvenancePanel({ echo, seal, onChanged }: { echo: EchoD
             {allOk ? <CheckCircle2 size={18} /> : <ShieldAlert size={18} />}
             {echo.forgottenAt ? 'Forgotten: nothing left to verify' : allOk ? 'Verified just now: every telling matches its seal' : 'Integrity check failed: see below'}
           </div>
-          <p className="text-xs text-muted">A hash shows whether this exact text changed. It cannot show whether the memory itself is true.</p>
+          <p className="text-xs text-muted">A hash shows whether this text changed, not whether the memory is true. Whitespace and Unicode form are normalised before hashing, so changes to those alone don't count. Someone with full database access could rewrite both the text and its seals, so keep an exported copy as your own independent record.</p>
         </div>
       </div>
 

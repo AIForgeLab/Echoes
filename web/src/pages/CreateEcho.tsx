@@ -24,7 +24,10 @@ interface Draft {
 const EMPTY: Draft = { title: '', text: '', memoryDate: '', toldOn: new Date().toISOString().slice(0, 10), tags: [], category: 'Personal', style: 'Cinematic', cover: null, enhanced: null, useSummary: true }
 
 function loadDraft(): Draft {
-  try { return { ...EMPTY, ...JSON.parse(sessionStorage.getItem(DRAFT_KEY) || '{}') } } catch { return EMPTY }
+  // Drafts are not persisted: memory text never sits unencrypted in browser storage.
+  // (Also removes a draft saved by an older version.)
+  try { sessionStorage.removeItem(DRAFT_KEY) } catch { /* ignore */ }
+  return EMPTY
 }
 
 export default function CreateEcho() {
@@ -43,8 +46,9 @@ export default function CreateEcho() {
   const fileRef = useRef<HTMLInputElement>(null)
   const set = (p: Partial<Draft>) => setD((x) => ({ ...x, ...p }))
   const [staleNote, setStaleNote] = useState(false)
+  const textNow = useRef(d.text)
+  useEffect(() => { textNow.current = d.text }, [d.text])
 
-  useEffect(() => { try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify(d)) } catch { /* draft is a convenience only */ } }, [d])
   useEffect(() => { let on = true; (d.text.trim() ? contentHash(d.text) : Promise.resolve(null)).then((h) => on && setHash(h)); return () => { on = false } }, [d.text])
 
   function validate(s: number): boolean {
@@ -64,7 +68,9 @@ export default function CreateEcho() {
   async function runEnhance() {
     setEnhancing(true); setEnhanceError('')
     try {
-      const r = await enhance(d.text)
+      const sent = d.text
+      const r = await enhance(sent)
+      if (textNow.current !== sent) { setStaleNote(true); return } // the text changed while the AI was working
       set({ enhanced: r, tags: d.tags.length ? d.tags : r.tags, category: r.category })
       setStaleNote(false)
     } catch (e) {

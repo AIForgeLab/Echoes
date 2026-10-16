@@ -116,3 +116,68 @@ begin
 end $$;
 revoke all on function forget_memory(uuid) from public, anon;
 grant execute on function forget_memory(uuid) to authenticated;
+
+-- Saving a memory, a retelling, or a memory's tags is ONE transaction each: nothing is ever half-saved.
+-- SECURITY INVOKER: they run as the signed-in user, so Row Level Security still applies.
+create or replace function create_memory(
+  p_title text, p_summary text, p_summary_generated boolean, p_category text, p_memory_date date,
+  p_cover text, p_style text, p_key text, p_told_on date, p_ciphertext text, p_iv text,
+  p_content_hash text, p_chain_hash text, p_sealed_at text, p_claims jsonb, p_tags text[]
+) returns uuid
+language plpgsql security invoker set search_path = public as $$
+declare v_mem uuid; v_ver uuid;
+begin
+  insert into memories (title, summary, summary_generated, category, memory_date, cover, style)
+    values (p_title, p_summary, p_summary_generated, p_category, p_memory_date, p_cover, p_style) returning id into v_mem;
+  insert into memory_keys (memory_id, key_b64) values (v_mem, p_key);
+  insert into versions (memory_id, version_no, told_on, ciphertext, iv, content_hash, prev_hash, chain_hash, sealed_at)
+    values (v_mem, 1, p_told_on, p_ciphertext, p_iv, p_content_hash, 'genesis', p_chain_hash, p_sealed_at) returning id into v_ver;
+  insert into claims (memory_id, version_id, idx, text, quote, start_char, end_char)
+    select v_mem, v_ver, (c->>'idx')::int, c->>'text', c->>'quote', (c->>'start_char')::int, (c->>'end_char')::int
+    from jsonb_array_elements(coalesce(p_claims, '[]'::jsonb)) c;
+  insert into tags (memory_id, tag) select distinct v_mem, t from unnest(coalesce(p_tags, '{}'::text[])) t;
+  return v_mem;
+end $$;
+
+create or replace function retell_memory(
+  p_memory uuid, p_told_on date, p_ciphertext text, p_iv text, p_content_hash text,
+  p_prev_hash text, p_chain_hash text, p_sealed_at text, p_claims jsonb
+) returns void
+language plpgsql security invoker set search_path = public as $$
+declare v_no int; v_chain text; v_ver uuid;
+begin
+  if not exists (select 1 from memory_keys where memory_id = p_memory) then
+    raise exception 'This memory has been forgotten and cannot be retold.';
+  end if;
+  -- lock the latest telling so two retellings at once can't both claim the next number
+  select version_no, chain_hash into v_no, v_chain from versions where memory_id = p_memory
+    order by version_no desc limit 1 for update;
+  if v_chain is distinct from p_prev_hash then
+    -- plain error code on purpose: 40001 (serialization failure) can make callers retry automatically
+    raise exception 'This memory changed while you were retelling it. Please try again.';
+  end if;
+  insert into versions (memory_id, version_no, told_on, ciphertext, iv, content_hash, prev_hash, chain_hash, sealed_at)
+    values (p_memory, v_no + 1, p_told_on, p_ciphertext, p_iv, p_content_hash, p_prev_hash, p_chain_hash, p_sealed_at)
+    returning id into v_ver;
+  insert into claims (memory_id, version_id, idx, text, quote, start_char, end_char)
+    select p_memory, v_ver, (c->>'idx')::int, c->>'text', c->>'quote', (c->>'start_char')::int, (c->>'end_char')::int
+    from jsonb_array_elements(coalesce(p_claims, '[]'::jsonb)) c;
+  update memories set updated_at = now() where id = p_memory;
+end $$;
+
+create or replace function set_memory_tags(p_memory uuid, p_tags text[]) returns void
+language plpgsql security invoker set search_path = public as $$
+begin
+  if not exists (select 1 from memories where id = p_memory and forgotten_at is null) then
+    raise exception 'This memory has been forgotten or does not exist.' using errcode = 'P0002';
+  end if;
+  delete from tags where memory_id = p_memory;
+  insert into tags (memory_id, tag) select distinct p_memory, t from unnest(coalesce(p_tags, '{}'::text[])) t;
+end $$;
+
+revoke all on function create_memory(text, text, boolean, text, date, text, text, text, date, text, text, text, text, text, jsonb, text[]) from public, anon;
+revoke all on function retell_memory(uuid, date, text, text, text, text, text, text, jsonb) from public, anon;
+revoke all on function set_memory_tags(uuid, text[]) from public, anon;
+grant execute on function create_memory(text, text, boolean, text, date, text, text, text, date, text, text, text, text, text, jsonb, text[]) to authenticated;
+grant execute on function retell_memory(uuid, date, text, text, text, text, text, text, jsonb) to authenticated;
+grant execute on function set_memory_tags(uuid, text[]) to authenticated;

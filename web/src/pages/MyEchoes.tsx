@@ -52,7 +52,7 @@ export default function MyEchoes() {
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4 mb-6">
         <StatCard icon={FileText} value={stats.total} label="Total Echoes" hint="Your saved memories" />
-        <StatCard icon={Network} value={stats.connections} label="Connections" hint="Pairs that share a tag" />
+        <StatCard icon={Network} value={stats.connections} label="Connections" hint="Pairs sharing a tag (the map also links themes and dates)" />
         <StatCard icon={Layers} value={stats.retold} label="Retold" hint="Told more than once" />
         <StatCard icon={CalendarDays} value={stats.thisWeek} label="This Week" hint="New memories" />
       </div>

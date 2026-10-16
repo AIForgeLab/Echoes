@@ -18,6 +18,7 @@ def client(monkeypatch):
     monkeypatch.delenv("SUPABASE_URL", raising=False)
     monkeypatch.delenv("SUPABASE_ANON_KEY", raising=False)
     monkeypatch.setenv("ECHOES_DEV_NO_AUTH", "1")
+    api._hits.clear()
     return api.app.test_client()
 
 
@@ -85,3 +86,11 @@ def test_valid_request_reaches_the_pipeline(client, monkeypatch):
     r = client.post("/ask", json=GOOD)
     assert r.status_code == 200
     assert r.get_json()["claims"][0]["type"] == "unknown"
+
+
+def test_rate_limit_per_caller(client, monkeypatch):
+    monkeypatch.setenv("RATE_PER_MINUTE", "2")
+    monkeypatch.setattr(pipeline, "guard", lambda *a, **k: [])
+    monkeypatch.setattr(pipeline, "answer", lambda *a, **k: [])
+    codes = [client.post("/ask", json=GOOD).status_code for _ in range(3)]
+    assert codes == [200, 200, 429]

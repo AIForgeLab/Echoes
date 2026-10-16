@@ -51,20 +51,15 @@ export default function EchoRoom() {
   const nav = useNavigate()
   const { echo, status, error, reload } = useEcho(id)
   const { ai } = useApp()
-  const storeKey = `echoes.chat.${id}`
-  const [turns, setTurns] = useState<Turn[]>(() => {
-    try {
-      const saved = JSON.parse(sessionStorage.getItem(storeKey) || '[]') as Turn[]
-      return saved.map((t) => (t.result || t.error ? t : { ...t, error: 'This question was interrupted before an answer arrived.' }))
-    } catch { return [] }
-  })
+  // The conversation lives in memory only: questions and answers are never written to browser storage.
+  const [turns, setTurns] = useState<Turn[]>(() => { try { sessionStorage.removeItem(`echoes.chat.${id}`) } catch { /* ignore */ } return [] })
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
   const [vi, setVi] = useState<number | null>(null)
   const [span, setSpan] = useState<{ start: number; end: number } | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => { try { sessionStorage.setItem(storeKey, JSON.stringify(turns)) } catch { /* convenience only */ } endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [turns, storeKey])
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [turns])
 
   if (status === 'loading') return <div className="space-y-4"><Skeleton className="h-24" /><Skeleton className="h-80" /></div>
   if (status === 'missing') return <ErrorState title="Memory not found" message="This memory doesn't exist in your archive." />
@@ -126,7 +121,7 @@ export default function EchoRoom() {
           )}
           {turns.map((t, i) => (
             <div key={i} className="space-y-3">
-              <div className="flex justify-end"><p className="max-w-[80%] rounded-2xl rounded-br-md bg-[#2a3140] px-4 py-2.5 text-[15px]">{t.q}</p></div>
+              <div className="flex flex-col items-end gap-1"><p className="max-w-[80%] rounded-2xl rounded-br-md bg-[#2a3140] px-4 py-2.5 text-[15px]">{t.q}</p><p className="text-xs text-muted">Checked against {echo.tellings.find((x) => x.id === t.tellingId)?.label ?? 'an earlier telling'}</p></div>
               {t.result ? <Answer r={t.result} onShow={setSpan} /> : t.error ? (
                 <div role="alert" className="card border-danger/50 p-4 max-w-2xl"><p className="text-danger text-sm">{t.error}</p><button className="text-sm text-gold mt-1 hover:underline" onClick={() => send(t.q)}>Try again</button></div>
               ) : <p className="flex items-center gap-2 text-muted text-sm"><Loader2 size={16} className="animate-spin" />Checking your memory…</p>}

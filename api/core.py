@@ -41,6 +41,8 @@ def find_span(text: str, quote: str):
     i = text.find(trimmed)
     if i != -1:
         return i, i + len(trimmed)
+    if len(text.lower()) != len(text):  # lowercasing would shift positions
+        return None
     low_text, low_q = text.lower(), trimmed.lower()
     if len(low_text) == len(text) and len(low_q) == len(trimmed):
         i = low_text.find(low_q)

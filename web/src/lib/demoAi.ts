@@ -162,6 +162,7 @@ export function findSpan(text: string, quote: string): [number, number] | null {
   if (i >= 0) return [i, i + q.length]
   const trimmed = q.replace(/^[\s"'“”‘’.,;:!?]+|[\s"'“”‘’.,;:!?]+$/g, '')
   if (trimmed.length < 3) return null
+  if (t.toLowerCase().length !== t.length) return null // lowercasing would shift positions
   i = t.toLowerCase().indexOf(trimmed.toLowerCase())
   return i >= 0 ? [i, i + trimmed.length] : null
 }

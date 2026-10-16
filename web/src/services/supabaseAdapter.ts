@@ -61,9 +61,20 @@ async function insertClaims(memoryId: string, versionId: string, claims: Claim[]
   check(await supabase().from('claims').insert(rows))
 }
 
+/** Encrypted claim rows for the create_memory / retell_memory database functions. */
+async function claimRows(claims: Claim[], key: string) {
+  return Promise.all(claims.map(async (c, i) => ({ idx: i, text: await sealField(key, c.text), quote: await sealField(key, c.quote), start_char: c.start, end_char: c.end })))
+}
+
+async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase().rpc(fn, args)
+  if (error) throw error.code === 'P0002' ? new NotFoundError(error.message) : new Error(error.message)
+  return data as T
+}
+
+// Replacing tags is one transaction (set_memory_tags), and refuses forgotten memories.
 async function setTags(memoryId: string, tags: string[]) {
-  check(await supabase().from('tags').delete().eq('memory_id', memoryId))
-  if (tags.length) check(await supabase().from('tags').insert(tags.map((tag) => ({ memory_id: memoryId, tag }))))
+  await rpc('set_memory_tags', { p_memory: memoryId, p_tags: tags })
 }
 
 export const supabaseAdapter: DataAdapter = {
@@ -122,21 +133,18 @@ export const supabaseAdapter: DataAdapter = {
     return detail
   },
 
+  // One transaction (create_memory in supabase/schema.sql): memory, key, first telling, facts and tags
+  // are saved together or not at all. Everything sensitive is encrypted here, before it leaves the browser.
   async createEcho(input) {
     const key = await newKey()
-    const mem = check(await supabase().from('memories').insert({
-      title: input.title.trim(), summary: input.summary ? await sealField(key, input.summary) : null, summary_generated: input.summaryGenerated,
-      category: input.category, memory_date: input.memoryDate, cover: input.cover, style: input.style,
-    }).select('id').single()) as { id: string }
-    check(await supabase().from('memory_keys').insert({ memory_id: mem.id, key_b64: key }))
     const s = await sealTelling(key, input.text, 'genesis')
-    const v = check(await supabase().from('versions').insert({
-      memory_id: mem.id, version_no: 1, told_on: input.toldOn, ciphertext: s.ciphertext, iv: s.iv,
-      content_hash: s.contentHash, prev_hash: s.prevHash, chain_hash: s.chainHash, sealed_at: s.sealedAt,
-    }).select('id').single()) as { id: string }
-    await insertClaims(mem.id, v.id, anchorClaims(input.text, input.claims), key)
-    await setTags(mem.id, input.tags)
-    return mem.id
+    return rpc<string>('create_memory', {
+      p_title: input.title.trim(), p_summary: input.summary ? await sealField(key, input.summary) : null,
+      p_summary_generated: input.summaryGenerated, p_category: input.category, p_memory_date: input.memoryDate,
+      p_cover: input.cover, p_style: input.style, p_key: key, p_told_on: input.toldOn,
+      p_ciphertext: s.ciphertext, p_iv: s.iv, p_content_hash: s.contentHash, p_chain_hash: s.chainHash, p_sealed_at: s.sealedAt,
+      p_claims: await claimRows(anchorClaims(input.text, input.claims), key), p_tags: input.tags,
+    })
   },
 
   async retell(id, { text, toldOn, claims }) {
@@ -144,12 +152,12 @@ export const supabaseAdapter: DataAdapter = {
     if (!k) throw new Error('This memory has been forgotten and cannot be retold.')
     const last = check(await supabase().from('versions').select('version_no,chain_hash').eq('memory_id', id).order('version_no', { ascending: false }).limit(1).single()) as { version_no: number; chain_hash: string }
     const s = await sealTelling(k.key_b64, text, last.chain_hash)
-    const v = check(await supabase().from('versions').insert({
-      memory_id: id, version_no: last.version_no + 1, told_on: toldOn, ciphertext: s.ciphertext, iv: s.iv,
-      content_hash: s.contentHash, prev_hash: s.prevHash, chain_hash: s.chainHash, sealed_at: s.sealedAt,
-    }).select('id').single()) as { id: string }
-    await insertClaims(id, v.id, anchorClaims(text, claims), k.key_b64)
-    check(await supabase().from('memories').update({ updated_at: new Date().toISOString() }).eq('id', id))
+    // One transaction (retell_memory): it also refuses if another retelling landed in the meantime.
+    await rpc('retell_memory', {
+      p_memory: id, p_told_on: toldOn, p_ciphertext: s.ciphertext, p_iv: s.iv, p_content_hash: s.contentHash,
+      p_prev_hash: s.prevHash, p_chain_hash: s.chainHash, p_sealed_at: s.sealedAt,
+      p_claims: await claimRows(anchorClaims(text, claims), k.key_b64),
+    })
   },
 
   async saveClaims(id, versionNo, claims) {
@@ -161,6 +169,9 @@ export const supabaseAdapter: DataAdapter = {
   },
 
   async updateMeta(id, patch) {
+    const m = check(await supabase().from('memories').select('forgotten_at').eq('id', id).maybeSingle()) as { forgotten_at: string | null } | null
+    if (!m) throw new NotFoundError('This memory does not exist in your archive.')
+    if (m.forgotten_at) throw new Error('This memory has been forgotten and can no longer be changed.')
     const row: Record<string, unknown> = { updated_at: new Date().toISOString() }
     if (patch.title !== undefined) row.title = patch.title
     if (patch.category !== undefined) row.category = patch.category
@@ -168,7 +179,7 @@ export const supabaseAdapter: DataAdapter = {
     if (patch.favourite !== undefined) row.favourite = patch.favourite
     if (patch.memoryDate !== undefined) row.memory_date = patch.memoryDate
     if (patch.cover !== undefined) row.cover = patch.cover
-    check(await supabase().from('memories').update(row).eq('id', id))
+    check(await supabase().from('memories').update(row).eq('id', id).is('forgotten_at', null))
     if (patch.tags) await setTags(id, patch.tags)
   },
 

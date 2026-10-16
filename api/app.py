@@ -5,6 +5,9 @@ unless FLASK_DEBUG=1, every input is type- and size-checked, and clients get gen
 the details go to the server log.
 """
 import os
+import threading
+import time
+from collections import defaultdict, deque
 
 import requests
 from dotenv import load_dotenv
@@ -34,12 +37,36 @@ class BadInput(ValueError):
     """A request the caller has to fix. Its message is safe to show."""
 
 
+# Per-user rate limit, so one account can't use up the AI quota. Kept in memory: it applies per server
+# process, which is enough for one instance; several instances would need a shared store.
+_hits = defaultdict(deque)
+_hits_lock = threading.Lock()
+
+
+def allow_request(who):
+    per_minute = int(os.environ.get("RATE_PER_MINUTE", "20"))
+    per_day = int(os.environ.get("RATE_PER_DAY", "400"))
+    now = time.time()
+    with _hits_lock:
+        q = _hits[who]
+        while q and now - q[0] > 86400:
+            q.popleft()
+        if len(q) >= per_day or sum(1 for t in q if now - t < 60) >= per_minute:
+            return False
+        q.append(now)
+        return True
+
+
+def limited():
+    return jsonify(error="That's a lot of AI requests in a short time. Please wait a minute and try again."), 429
+
+
 def require_user():
     """Only signed-in Echoes users may call the AI routes (checks the Supabase token). Fails closed."""
     url, anon = os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_ANON_KEY")
     if not url or not anon:
-        if os.environ.get("ECHOES_DEV_NO_AUTH") == "1":
-            return None  # deliberate local development without accounts
+        if os.environ.get("ECHOES_DEV_NO_AUTH") == "1":  # deliberate local development without accounts
+            return None if allow_request(f"ip:{request.remote_addr}") else limited()
         app.logger.error("SUPABASE_URL / SUPABASE_ANON_KEY are not set: refusing AI requests")
         return jsonify(error="The AI server isn't set up to check sign-ins."), 503
     token = request.headers.get("Authorization", "")
@@ -52,7 +79,8 @@ def require_user():
         return jsonify(error="Couldn't check your sign-in. Please try again."), 503
     if r.status_code != 200:
         return jsonify(error="Please sign in."), 401
-    return None
+    user_id = (r.json() or {}).get("id") or token
+    return None if allow_request(f"user:{user_id}") else limited()
 
 
 def body():

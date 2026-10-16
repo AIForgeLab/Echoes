@@ -50,7 +50,7 @@ export default function Dashboard() {
         <>
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">
             <StatCard icon={FileText} value={stats.total} label="Echoes" hint="Saved memories" />
-            <StatCard icon={Network} value={stats.connections} label="Connections" hint="Pairs that share a tag" />
+            <StatCard icon={Network} value={stats.connections} label="Connections" hint="Pairs sharing a tag (the map also links themes and dates)" />
             <StatCard icon={Layers} value={stats.retold} label="Retold" hint="Memories told more than once" />
             <StatCard icon={CalendarDays} value={stats.thisWeek} label="This Week" hint="New memories" />
           </div>

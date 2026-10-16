@@ -109,7 +109,8 @@ runs a second entailment check, and the browser re-checks the quote again before
   database provider's retention schedule. Text already sent to the AI provider follows that provider's
   retention policy. EU regulators still treat encrypted data as personal data, so this means
   "unreadable in the live database", not a legal guarantee of erasure.
-- **A hash proves the text didn't change**, not that the memory is true.
+- **A hash proves the text didn't change**, not that the memory is true. Text is normalised (Unicode NFC, single spaces) before hashing, so whitespace-only changes don't count. The chain is not anchored anywhere outside the database: someone with full database access could rewrite text and seals together. An exported bundle, checked with `tools/verify.py`, is the independent record.
+- **Drafts and Echo Room conversations** are kept in memory only and disappear when you leave the page.
 - **Account deletion** needs a server-side admin action that isn't included.
 - Chat conversations are kept for the browser session only.
 - Demo thumbnails were cropped from the project's own design mockups; new memories use their seal portrait or an uploaded image.
