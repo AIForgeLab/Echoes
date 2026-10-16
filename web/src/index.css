@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+/* Tokens taken from the Echoes reference designs */
+@theme {
+  --color-night: #080807;
+  --color-surface: #111110;
+  --color-surface-2: #171614;
+  --color-bronze: #5c4528;
+  --color-gold: #f4d18e;
+  --color-flame: #ffb84d;
+  --color-ivory: #f6ebdd;
+  --color-muted: #a39a8c;
+  --color-emerald: #5fbf8f;
+  --color-violet: #a593f0;
+  --color-amber: #f2b544;
+  --color-danger: #d0645a;
+  --font-serif: "Cormorant Garamond", "Cormorant", Georgia, serif;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+html { color-scheme: dark; }
+body {
+  margin: 0;
+  background: var(--color-night);
+  color: var(--color-ivory);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Restrained star field + warm ambient light */
+.starfield {
+  background-color: var(--color-night);
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgba(255, 220, 160, 0.55), transparent 60%),
+    radial-gradient(1px 1px at 72% 12%, rgba(255, 220, 160, 0.45), transparent 60%),
+    radial-gradient(1.5px 1.5px at 38% 64%, rgba(255, 200, 130, 0.5), transparent 60%),
+    radial-gradient(1px 1px at 86% 72%, rgba(255, 220, 160, 0.4), transparent 60%),
+    radial-gradient(1px 1px at 22% 86%, rgba(255, 220, 160, 0.35), transparent 60%),
+    radial-gradient(1px 1px at 55% 35%, rgba(255, 220, 160, 0.35), transparent 60%),
+    radial-gradient(1.5px 1.5px at 92% 40%, rgba(255, 190, 110, 0.45), transparent 60%),
+    radial-gradient(900px 500px at 85% -10%, rgba(255, 184, 77, 0.06), transparent 70%);
+  background-size: 420px 420px, 380px 380px, 520px 520px, 460px 460px, 360px 360px, 300px 300px, 540px 540px, 100% 100%;
+}
+[data-effects="subtle"] .starfield { background-image: radial-gradient(900px 500px at 85% -10%, rgba(255, 184, 77, 0.04), transparent 70%); }
+
+@layer components {
+  .card { @apply rounded-2xl border border-bronze/45 bg-surface/90; }
+  .card-hover { @apply transition duration-200 hover:border-gold/60 hover:shadow-[0_0_24px_-8px_rgba(255,184,77,0.35)]; }
+  .glow { box-shadow: 0 0 0 1px rgba(244, 209, 142, 0.7), 0 0 28px -6px rgba(255, 184, 77, 0.45); }
+  [data-effects="subtle"] .glow { box-shadow: 0 0 0 1px rgba(244, 209, 142, 0.7); }
+  .input {
+    @apply w-full rounded-lg border border-bronze/50 bg-surface-2 px-3.5 py-2.5 text-ivory placeholder:text-muted/70
+      focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold/20;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-gold px-5 py-2.5 font-medium text-night
+      shadow-[0_0_24px_-6px_rgba(255,184,77,0.5)] transition hover:bg-[#f8dca5] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-bronze/60 bg-surface-2/60 px-4 py-2.5 text-ivory
+      transition hover:border-gold/70 hover:text-gold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer;
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-danger/50 bg-danger/15 px-4 py-2.5 text-danger
+      transition hover:bg-danger/25 disabled:opacity-40 cursor-pointer;
+  }
+  .icon-btn {
+    @apply grid place-items-center size-10 rounded-xl border border-bronze/60 bg-surface-2/60 text-ivory transition hover:border-gold hover:text-gold cursor-pointer;
+  }
+  .label { @apply block text-sm text-ivory/90 mb-1.5; }
+}
+
+:focus-visible { outline: 2px solid var(--color-flame); outline-offset: 2px; }
+
+[data-motion="reduced"] *, [data-motion="reduced"] *::before, [data-motion="reduced"] *::after { animation: none !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* React Flow theming */
+.react-flow { --xy-background-color: transparent; }
+.react-flow__attribution { background: transparent !important; }
+.react-flow__attribution a { color: var(--color-muted) !important; }
