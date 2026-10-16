@@ -37,6 +37,10 @@ def _client(kind: str) -> OpenAI:
     return _clients[kind]
 
 
+class AIServiceError(RuntimeError):
+    """A problem with the AI provider, described in words that are safe to show users."""
+
+
 def model_name():
     return _env("CHAT_MODEL", default="openai/gpt-oss-120b")
 
@@ -53,10 +57,10 @@ def _with_retry(call):
             return call()
         except RateLimitError:
             if attempt == 3:
-                raise RuntimeError("The AI service is busy (rate limit reached). Wait a few seconds and try again.")
+                raise AIServiceError("The AI service is busy (rate limit reached). Wait a few seconds and try again.")
         except APITimeoutError:
             if attempt >= 1:
-                raise RuntimeError("The AI model took too long to answer. Please try again.")
+                raise AIServiceError("The AI model took too long to answer. Please try again.")
         except APIStatusError as e:
             if e.status_code < 500 or attempt == 3:
                 raise
@@ -103,7 +107,7 @@ def generate_json(system: str, prompt: str, model: str | None = None) -> dict:
             return parse_json(resp.choices[0].message.content)
         except (ValueError, json.JSONDecodeError) as e:
             last_error = e
-    raise RuntimeError(f"The AI model did not return valid JSON: {last_error}")
+    raise AIServiceError("The AI model gave an answer Echoes couldn't read. Please try again.") from last_error
 
 
 def embed(texts, model: str | None = None):

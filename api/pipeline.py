@@ -145,6 +145,11 @@ Label each pair:
 Return JSON: {"results": [{"id": <id>, "label": "consistent" | "changed" | "unrelated"}]}"""
 
 
+# One shared content word between two short claims scores about 0.15-0.25 with lexical vectors,
+# so keep the cut-off low: the judge model still rejects pairs that turn out to be unrelated.
+LEXICAL_THRESHOLD = 0.12
+
+
 def pentimento(old_claims, new_claims, gen, emb=None):
     """Pair claims (Hungarian matching on vector similarity), then let the model judge each pair.
     emb=None uses local TF-IDF vectors, so no embedding API is needed."""
@@ -152,5 +157,5 @@ def pentimento(old_claims, new_claims, gen, emb=None):
         out = gen(JUDGE_SYSTEM, json.dumps(pairs))
         return {r.get("id"): r.get("label") for r in out.get("results", [])}
     if emb is None:
-        return align_claims(old_claims, new_claims, lexical_vectors, judge, threshold=0.2)
+        return align_claims(old_claims, new_claims, lexical_vectors, judge, threshold=LEXICAL_THRESHOLD)
     return align_claims(old_claims, new_claims, emb, judge)

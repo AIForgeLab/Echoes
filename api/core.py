@@ -115,7 +115,7 @@ def align_claims(old, new, embed_fn, judge_fn, threshold=0.6):
     2. Hungarian algorithm = best one-to-one pairing of old and new claims
     3. drop weak pairs (< threshold), ask the judge about the rest
     4. anything unpaired is 'omitted' (only in old) or 'new' (only in new)
-    With lexical_vectors use a lower threshold (about 0.2) than with neural embeddings.
+    With lexical_vectors use a much lower threshold (about 0.12) than with neural embeddings.
     """
     result = []
     paired_old, paired_new = set(), set()

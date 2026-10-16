@@ -6,6 +6,7 @@ import { decrypt, encrypt, newKey } from '../lib/vault'
 import { NotFoundError, tamperText, tellingLabel, type DataAdapter } from './adapter'
 import { sealTelling } from './sealing'
 import { SEEDS, seedClaims } from './seed'
+import { anchorClaims } from '../lib/claims'
 
 const KEY = 'echoes.demo.v1'
 const DEMO_EMAIL = 'demo@echoes.local'
@@ -211,7 +212,7 @@ export const demoAdapter: DataAdapter = {
       id: uid(), title: input.title.trim(), summary: input.summary, summaryGenerated: input.summaryGenerated,
       category: input.category, tags: input.tags, memoryDate: input.memoryDate, cover: input.cover, style: input.style,
       favourite: false, createdAt: now, updatedAt: now, forgottenAt: null, key,
-      tellings: [{ id: uid(), versionNo: 1, toldOn: input.toldOn, ...sealed, claims: input.claims }], tombstone: null,
+      tellings: [{ id: uid(), versionNo: 1, toldOn: input.toldOn, ...sealed, claims: anchorClaims(input.text, input.claims) }], tombstone: null,
     }
     mine(db).unshift(rec)
     save(db)
@@ -224,7 +225,7 @@ export const demoAdapter: DataAdapter = {
     if (!r.key) throw new Error('This memory has been forgotten and cannot be retold.')
     const last = [...r.tellings].sort((a, b) => b.versionNo - a.versionNo)[0]!
     const sealed = await sealTelling(r.key, text, last.chainHash)
-    r.tellings.push({ id: uid(), versionNo: last.versionNo + 1, toldOn, ...sealed, claims })
+    r.tellings.push({ id: uid(), versionNo: last.versionNo + 1, toldOn, ...sealed, claims: anchorClaims(text, claims) })
     r.updatedAt = new Date().toISOString()
     save(db)
   },

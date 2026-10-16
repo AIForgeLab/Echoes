@@ -42,6 +42,7 @@ export default function CreateEcho() {
   const [saving, setSaving] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const set = (p: Partial<Draft>) => setD((x) => ({ ...x, ...p }))
+  const [staleNote, setStaleNote] = useState(false)
 
   useEffect(() => { try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify(d)) } catch { /* draft is a convenience only */ } }, [d])
   useEffect(() => { let on = true; (d.text.trim() ? contentHash(d.text) : Promise.resolve(null)).then((h) => on && setHash(h)); return () => { on = false } }, [d.text])
@@ -65,6 +66,7 @@ export default function CreateEcho() {
     try {
       const r = await enhance(d.text)
       set({ enhanced: r, tags: d.tags.length ? d.tags : r.tags, category: r.category })
+      setStaleNote(false)
     } catch (e) {
       setEnhanceError((e as Error).message)
     }
@@ -141,7 +143,8 @@ export default function CreateEcho() {
                   <span className={cx('text-sm', d.text.length > MAX ? 'text-danger' : 'text-muted')}>{d.text.length}/{MAX}</span>
                 </div>
                 <p className="text-sm text-muted mb-2">Share your memory, story, experience or idea, in your own words. This original is sealed and never rewritten.</p>
-                <textarea id="text" className="input min-h-44" placeholder="Write your memory here…" value={d.text} onChange={(e) => set({ text: e.target.value })} aria-invalid={!!errors.text} />
+                <textarea id="text" className="input min-h-44" placeholder="Write your memory here…" value={d.text} onChange={(e) => { if (d.enhanced) setStaleNote(true); set(d.enhanced ? { text: e.target.value, enhanced: null } : { text: e.target.value }) }} aria-invalid={!!errors.text} />
+                  {staleNote && !d.enhanced && <p className="text-sm text-amber mt-1">You changed the text, so the earlier AI suggestions were cleared. Generate them again in the next step.</p>}
                 {errors.text && <p className="text-sm text-danger mt-1">{errors.text}</p>}
               </div>
               <div className="grid sm:grid-cols-2 gap-4">

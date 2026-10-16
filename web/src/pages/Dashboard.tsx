@@ -1,17 +1,32 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, CalendarDays, FileText, Layers, Network, Plus, Clock, Images } from 'lucide-react'
+import { ArrowRight, CalendarDays, FileText, Layers, Loader2, Network, Plus, Clock, Images } from 'lucide-react'
 import { useApp } from '../state/AppState'
 import { archiveStats, recentActivity } from '../lib/stats'
 import { relativeTime } from '../lib/format'
 import EchoCard from '../components/EchoCard'
 import { CardGridSkeleton, EmptyState, ErrorState, SearchInput, StatCard } from '../components/ui'
 import { useEchoActions } from '../hooks/useEchoActions'
+import { useToast } from '../components/Toast'
+import { data } from '../services/data'
+import { loadSamples, SAMPLE_NAME } from '../services/samples'
 
 export default function Dashboard() {
   const { user, echoes, echoesError, refreshEchoes } = useApp()
   const [q, setQ] = useState('')
   const actions = useEchoActions()
+  const toast = useToast()
+  const [loading, setLoading] = useState(false)
+
+  async function addSamples() {
+    setLoading(true)
+    try {
+      const r = await loadSamples(data, echoes ?? [])
+      await refreshEchoes()
+      toast('success', `Added ${r.added} sample memories from ${SAMPLE_NAME}'s fictional archive.`)
+    } catch (e) { toast('error', (e as Error).message) }
+    setLoading(false)
+  }
   const live = useMemo(() => (echoes ?? []).filter((e) => !e.forgottenAt), [echoes])
   const stats = useMemo(() => archiveStats(live), [live])
   const hour = new Date().getHours()
@@ -41,8 +56,8 @@ export default function Dashboard() {
           </div>
 
           {live.length === 0 ? (
-            <EmptyState icon={Images} title="Your archive is waiting" action={<Link to="/echoes/new" className="btn-primary"><Plus size={18} />Create your first Echo</Link>}>
-              Write a memory in your own words. Echoes seals the original so nothing, not even the AI, can quietly rewrite it.
+            <EmptyState icon={Images} title="Your archive is waiting" action={<div className="flex flex-wrap justify-center gap-3"><Link to="/echoes/new" className="btn-primary"><Plus size={18} />Create your first Echo</Link><button className="btn-ghost" disabled={loading} onClick={addSamples}>{loading && <Loader2 size={16} className="animate-spin" />}Load sample memories</button></div>}>
+              Write a memory in your own words. Echoes seals the original so nothing, not even the AI, can quietly rewrite it. Or load six memories of {SAMPLE_NAME}, a fictional person, to try it first.
             </EmptyState>
           ) : (
             <div className="grid xl:grid-cols-[1fr_300px] gap-8">

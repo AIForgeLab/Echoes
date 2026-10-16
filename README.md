@@ -9,7 +9,7 @@ against that risk:
 
 | Feature | What it does |
 |---|---|
-| **Truth Boundary** | Every AI answer is split into *source-backed* (with an exact quote that code, not the model, verifies), *interpretation*, and *unknown*. |
+| **Truth Boundary** | Every AI answer is split into *source-backed* (quoting your exact words: code confirms the quote is in the memory, and a second AI check confirms it supports the answer), *interpretation*, and *unknown*. |
 | **Assumption guard** | Leading questions ("Was Dad proud when the robot won?") are checked against what you actually wrote before anything is answered. |
 | **Pentimento** | Retell a memory later; Echoes X-rays the two tellings and shows what was kept, changed, faded away, or appeared later. |
 | **The Seal** | Every telling is canonicalised, SHA-256 hashed and hash-chained like git commits. A portrait generated from the hash makes tampering visible. |
@@ -40,6 +40,8 @@ python app.py                                           # http://localhost:5001
 
 …and set `VITE_API_URL=http://localhost:5001` in `web/.env` (copy `web/.env.example`), then restart `npm run dev`.
 
+The API refuses AI requests unless it can check sign-ins (Supabase settings in `api/.env`). For local development without accounts, set `ECHOES_DEV_NO_AUTH=1`. Debug mode is off unless `FLASK_DEBUG=1`.
+
 ## Live mode (real accounts with Supabase)
 
 1. Create a Supabase project. In **Authentication → Sign In / Providers → Email**, decide whether
@@ -52,6 +54,17 @@ python app.py                                           # http://localhost:5001
 5. Add `http://localhost:5173/reset-password` to **Authentication → URL Configuration → Redirect URLs**
    so password reset emails work.
 
+## Sample memories
+
+**Settings → Data management → Load sample memories** (or the button on an empty dashboard) adds six
+memories of Rahul Mehta, a fictional person born in 1947, to the signed-in archive. They go through the
+normal create path, so each is encrypted with its own key and sealed. One of them, *The Little Circuit
+That Changed Everything*, has a second, invented retelling so the X-ray and the assumption guard have
+something to compare. Each Echo Room for a sample memory suggests its test questions, for example
+"What prize did my circuit win?" or "What was the exact amount of my first salary?". The data lives in
+`web/src/services/samples.ts`; the evidence labels (family-reported, first-person, written-note) are
+example tags, not checked sources.
+
 ## Scripts
 
 | Where | Command | What |
@@ -61,7 +74,7 @@ python app.py                                           # http://localhost:5001
 | web | `npm run typecheck` | TypeScript check only |
 | web | `npm test` | Unit tests (seal, encryption, portraits, Truth Boundary rules, drift) |
 | api | `python -m pytest -q` | API tests (quote verification, guard, alignment), no key needed |
-| tools | `python tools/verify.py <export.json>` | Verify an exported archive's seals without Echoes |
+| tools | `python tools/verify.py <export.json>` | Verify an exported archive's seals without Echoes (exit 0 intact, 1 failed or unreadable, 2 incomplete because some tellings were forgotten) |
 
 ## Architecture
 
@@ -87,7 +100,7 @@ runs a second entailment check, and the browser re-checks the quote again before
 ## Honest limits
 
 - **Demo mode** is single-browser storage with a local password check. It is not secure authentication.
-- **Encryption keys** are stored in the same database as the ciphertext (a separate table, protected
+- **What is encrypted:** each telling's text, the facts and quotes extracted from it, and AI summaries (AES-GCM, one key per memory). Titles, tags, dates, themes and covers are stored unencrypted. Keys live in a separate, access-controlled table in the same database, so this is not end-to-end encryption: it mainly makes forgetting real. A future version should wrap keys with a key derived from the user's passphrase. Facts saved before this change stay readable as they were.
   by RLS). A future version should wrap each key with a key derived from the user's password, so the
   server never holds a usable key.
 - **Forgetting** destroys the key in the live database, so the copy there becomes unreadable. It does

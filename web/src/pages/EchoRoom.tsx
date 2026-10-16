@@ -9,6 +9,7 @@ import { formatDate, cx } from '../lib/format'
 import EchoArt from '../components/EchoArt'
 import SourceText from '../components/SourceText'
 import { DemoLabel, ErrorState, Skeleton, TagChip, TruthBoundaryBadge } from '../components/ui'
+import { sampleQuestions } from '../services/samples'
 
 interface Turn { q: string; tellingId: string; result?: AskResult; error?: string }
 const SUGGESTIONS = ['Why was this moment important?', 'Who was with me?', 'What happened next?']
@@ -120,7 +121,7 @@ export default function EchoRoom() {
             <div className="text-center py-10 space-y-4">
               <p className="font-serif text-2xl">Question this memory</p>
               <p className="text-muted max-w-md mx-auto">Every answer is marked <span className="text-emerald">source-backed</span>, <span className="text-violet">interpretation</span> or <span className="text-amber">unknown</span>. Leading questions get checked against what you actually wrote.</p>
-              <div className="flex flex-wrap justify-center gap-2">{SUGGESTIONS.map((s) => <button key={s} className="btn-ghost text-sm py-2" onClick={() => send(s)}>{s}</button>)}</div>
+              <div className="flex flex-wrap justify-center gap-2">{(sampleQuestions(echo.title) ?? SUGGESTIONS).map((s) => <button key={s} className="btn-ghost text-sm py-2" onClick={() => send(s)}>{s}</button>)}</div>
             </div>
           )}
           {turns.map((t, i) => (

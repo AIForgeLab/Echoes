@@ -1,9 +1,10 @@
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Download, KeyRound, Loader2, LogOut, RefreshCw, Trash2 } from 'lucide-react'
+import { BookOpen, Download, KeyRound, Loader2, LogOut, RefreshCw, Trash2 } from 'lucide-react'
 import { useApp } from '../state/AppState'
 import { data } from '../services/data'
 import { recheckAi } from '../services/ai'
+import { loadSamples, SAMPLE_NAME } from '../services/samples'
 import { API_URL, APP_VERSION } from '../config'
 import { bundleOf, downloadJson } from '../lib/exportBundle'
 import { initials } from '../lib/format'
@@ -73,7 +74,7 @@ export default function Settings() {
 
       <Section title="Privacy and AI" id="s-privacy">
         <ul className="text-sm text-muted space-y-1.5 list-disc pl-5">
-          <li>Each memory is encrypted in your browser with its own key before it is stored.</li>
+          <li>{data.mode === 'live' ? 'Each memory’s text, the facts and quotes drawn from it, and AI summaries are encrypted in your browser with that memory’s own key. Titles, tags, dates and themes are stored unencrypted so the archive can sort and connect them. Keys sit in a separate access-controlled table in the same database, so this is not end-to-end encryption.' : 'Each memory’s text is encrypted with its own key; in demo mode the key is kept in this browser too.'}</li>
           <li>Memories are private to your account. Nothing is shared publicly.</li>
           <li>When you use an AI feature, only that memory's text (and its other tellings, for the assumption check) is sent to the Echoes AI server, which forwards it to an AI model hosted by Groq. Your other memories are never sent. During the demo, use fictional memories: free API tiers are meant for testing, not personal data.</li>
           <li>Generated summaries are always stored and shown separately from your own words.</li>
@@ -103,11 +104,18 @@ export default function Settings() {
               toast('success', `Exported ${all.length} memories with their seals.`)
             })}>{busy === 'export' ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}Export all memories (JSON)</button>
           <button className="btn-danger" onClick={() => setClearOpen(true)} disabled={!echoes?.some((e) => !e.forgottenAt)}><Trash2 size={16} />Forget all memories</button>
+          <button className="btn-ghost" disabled={busy === 'samples' || !echoes}
+            onClick={() => run('samples', async () => {
+              const r = await loadSamples(data, echoes ?? [])
+              await refreshEchoes()
+              toast('success', r.added ? `Added ${r.added} sample memories from ${SAMPLE_NAME}'s fictional archive.` : 'The sample memories are already in your archive.')
+            })}>{busy === 'samples' ? <Loader2 size={16} className="animate-spin" /> : <BookOpen size={16} />}Load sample memories</button>
           {data.mode === 'demo' && data.resetDemo && (
             <button className="btn-ghost" disabled={busy === 'reset'} onClick={() => run('reset', async () => { await data.resetDemo!(); await refreshEchoes(); toast('success', 'Demo archive reset.') })}><RefreshCw size={16} />Reset demo data</button>
           )}
         </div>
         <div className="text-sm text-muted space-y-1.5">
+          <p><strong className="text-ivory">Sample memories:</strong> six memories of {SAMPLE_NAME}, a fictional person, so you can try Echoes without writing your own. They are encrypted and sealed like any memory, and one includes an invented retelling so you can see the X-ray. Their source labels are examples, not checked sources. Forget them any time.</p>
           <p><strong className="text-ivory">What forgetting does:</strong> deletes summaries, tags and extracted facts, then destroys the memory's encryption key. The remaining ciphertext can never be decrypted, and a tombstone records that something was forgotten.</p>
           <p><strong className="text-ivory">Limits:</strong> {data.mode === 'live'
             ? "each key is stored in the same database as the encrypted text, in a separate access-controlled table. A database backup made before you forget a memory holds both, so that memory can still be read from the backup until the backup is deleted under your database provider's retention schedule."

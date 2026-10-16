@@ -3,8 +3,9 @@
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js'
 import type { AppUser, Claim, Echo, EchoDetail, Telling } from '../types'
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from '../config'
-import { decrypt, encrypt, newKey } from '../lib/vault'
-import { NotFoundError, tamperText, tellingLabel, type DataAdapter } from './adapter'
+import { decrypt, newKey, openField, sealField } from '../lib/vault'
+import { NotFoundError, tellingLabel, type DataAdapter } from './adapter'
+import { anchorClaims } from '../lib/claims'
 import { sealTelling } from './sealing'
 
 let client: SupabaseClient | null = null
@@ -43,7 +44,7 @@ const keyOf = (r: Row) => (Array.isArray(r.memory_keys) ? r.memory_keys[0]?.key_
 async function toEcho(r: Row): Promise<Echo> {
   const latest = [...r.versions].sort((a, b) => b.version_no - a.version_no)[0]
   return {
-    id: r.id, title: r.title ?? 'A forgotten memory', summary: r.summary, summaryGenerated: r.summary_generated,
+    id: r.id, title: r.title ?? 'A forgotten memory', summary: await openField(keyOf(r), r.summary), summaryGenerated: r.summary_generated,
     category: r.category, tags: r.tags.map((t) => t.tag), memoryDate: r.memory_date, cover: r.cover, style: r.style,
     favourite: r.favourite, createdAt: r.created_at, updatedAt: r.updated_at, forgottenAt: r.forgotten_at,
     text: latest ? await decrypt(keyOf(r), latest.ciphertext, latest.iv) : null,
@@ -51,9 +52,13 @@ async function toEcho(r: Row): Promise<Echo> {
   }
 }
 
-async function insertClaims(memoryId: string, versionId: string, claims: Claim[]) {
+/** Facts and their quotes are encrypted with the memory's key: a quote is the memory's own words. */
+async function insertClaims(memoryId: string, versionId: string, claims: Claim[], key: string) {
   if (!claims.length) return
-  check(await supabase().from('claims').insert(claims.map((c, i) => ({ memory_id: memoryId, version_id: versionId, idx: i, text: c.text, quote: c.quote, start_char: c.start, end_char: c.end }))))
+  const rows = await Promise.all(claims.map(async (c, i) => ({
+    memory_id: memoryId, version_id: versionId, idx: i, text: await sealField(key, c.text), quote: await sealField(key, c.quote), start_char: c.start, end_char: c.end,
+  })))
+  check(await supabase().from('claims').insert(rows))
 }
 
 async function setTags(memoryId: string, tags: string[]) {
@@ -103,13 +108,14 @@ export const supabaseAdapter: DataAdapter = {
       { version_id: string; text: string; quote: string; start_char: number; end_char: number }[]
     const tomb = check(await supabase().from('tombstones').select('chain_hash,forgotten_at').eq('memory_id', id).maybeSingle()) as { chain_hash: string; forgotten_at: string } | null
     const key = keyOf(row)
+    const opened = await Promise.all(claims.map(async (c) => ({ versionId: c.version_id, text: await openField(key, c.text), quote: await openField(key, c.quote), start: c.start_char, end: c.end_char })))
     const tellings: Telling[] = []
     for (const v of [...row.versions].sort((a, b) => a.version_no - b.version_no)) {
       tellings.push({
         id: v.id, versionNo: v.version_no, toldOn: v.told_on, label: tellingLabel(v.version_no, v.told_on),
         text: await decrypt(key, v.ciphertext, v.iv), ciphertext: v.ciphertext, contentHash: v.content_hash,
         prevHash: v.prev_hash, chainHash: v.chain_hash, sealedAt: v.sealed_at,
-        claims: claims.filter((c) => c.version_id === v.id).map((c) => ({ text: c.text, quote: c.quote, start: c.start_char, end: c.end_char })),
+        claims: opened.flatMap((c) => (c.versionId === v.id && c.text != null && c.quote != null ? [{ text: c.text, quote: c.quote, start: c.start, end: c.end }] : [])),
       })
     }
     const detail: EchoDetail = { ...(await toEcho(row)), tellings, tombstone: tomb ? { chainHash: tomb.chain_hash, forgottenAt: tomb.forgotten_at } : null }
@@ -117,18 +123,18 @@ export const supabaseAdapter: DataAdapter = {
   },
 
   async createEcho(input) {
-    const mem = check(await supabase().from('memories').insert({
-      title: input.title.trim(), summary: input.summary, summary_generated: input.summaryGenerated, category: input.category,
-      memory_date: input.memoryDate, cover: input.cover, style: input.style,
-    }).select('id').single()) as { id: string }
     const key = await newKey()
+    const mem = check(await supabase().from('memories').insert({
+      title: input.title.trim(), summary: input.summary ? await sealField(key, input.summary) : null, summary_generated: input.summaryGenerated,
+      category: input.category, memory_date: input.memoryDate, cover: input.cover, style: input.style,
+    }).select('id').single()) as { id: string }
     check(await supabase().from('memory_keys').insert({ memory_id: mem.id, key_b64: key }))
     const s = await sealTelling(key, input.text, 'genesis')
     const v = check(await supabase().from('versions').insert({
       memory_id: mem.id, version_no: 1, told_on: input.toldOn, ciphertext: s.ciphertext, iv: s.iv,
       content_hash: s.contentHash, prev_hash: s.prevHash, chain_hash: s.chainHash, sealed_at: s.sealedAt,
     }).select('id').single()) as { id: string }
-    await insertClaims(mem.id, v.id, input.claims)
+    await insertClaims(mem.id, v.id, anchorClaims(input.text, input.claims), key)
     await setTags(mem.id, input.tags)
     return mem.id
   },
@@ -142,14 +148,16 @@ export const supabaseAdapter: DataAdapter = {
       memory_id: id, version_no: last.version_no + 1, told_on: toldOn, ciphertext: s.ciphertext, iv: s.iv,
       content_hash: s.contentHash, prev_hash: s.prevHash, chain_hash: s.chainHash, sealed_at: s.sealedAt,
     }).select('id').single()) as { id: string }
-    await insertClaims(id, v.id, claims)
+    await insertClaims(id, v.id, anchorClaims(text, claims), k.key_b64)
     check(await supabase().from('memories').update({ updated_at: new Date().toISOString() }).eq('id', id))
   },
 
   async saveClaims(id, versionNo, claims) {
+    const k = check(await supabase().from('memory_keys').select('key_b64').eq('memory_id', id).maybeSingle()) as { key_b64: string } | null
+    if (!k) throw new Error('This memory has been forgotten.')
     const v = check(await supabase().from('versions').select('id').eq('memory_id', id).eq('version_no', versionNo).single()) as { id: string }
     check(await supabase().from('claims').delete().eq('version_id', v.id))
-    await insertClaims(id, v.id, claims)
+    await insertClaims(id, v.id, claims, k.key_b64)
   },
 
   async updateMeta(id, patch) {
@@ -164,30 +172,27 @@ export const supabaseAdapter: DataAdapter = {
     if (patch.tags) await setTags(id, patch.tags)
   },
 
+  // One database transaction (forget_memory in supabase/schema.sql): all steps happen or none do,
+  // and calling it again on a forgotten memory is harmless.
   async forget(id) {
-    const vs = check(await supabase().from('versions').select('chain_hash,version_no').eq('memory_id', id).order('version_no', { ascending: false }).limit(1)) as { chain_hash: string }[]
-    if (!vs.length) throw new NotFoundError('This memory does not exist in your archive.')
-    check(await supabase().from('claims').delete().eq('memory_id', id))
-    check(await supabase().from('tags').delete().eq('memory_id', id))
-    check(await supabase().from('memory_keys').delete().eq('memory_id', id)) // crypto-shredding
-    check(await supabase().from('versions').update({ content_hash: null }).eq('memory_id', id))
-    check(await supabase().from('memories').update({ title: null, summary: null, cover: null, favourite: false, forgotten_at: new Date().toISOString() }).eq('id', id))
-    check(await supabase().from('tombstones').insert({ memory_id: id, chain_hash: vs[0]!.chain_hash }))
+    const { error } = await supabase().rpc('forget_memory', { p_memory: id })
+    if (error) throw error.code === 'P0002' ? new NotFoundError(error.message) : new Error(error.message)
   },
 
-  async tamper(id, versionNo) {
-    const k = check(await supabase().from('memory_keys').select('key_b64').eq('memory_id', id).single()) as { key_b64: string }
-    const v = check(await supabase().from('versions').select('id,ciphertext,iv').eq('memory_id', id).eq('version_no', versionNo).single()) as { id: string; ciphertext: string; iv: string }
-    const plain = await decrypt(k.key_b64, v.ciphertext, v.iv)
-    if (plain == null) throw new Error('This telling is already unreadable.')
-    const { text, word } = tamperText(plain)
-    check(await supabase().from('versions').update(await encrypt(k.key_b64, text)).eq('id', v.id))
-    return word
+  // Real memories are never altered on purpose: in live mode the Provenance panel only simulates
+  // tampering on a copy in the browser. This guard makes sure no code path can write it.
+  async tamper() {
+    throw new Error('Tampering is only simulated in live mode; stored memories are never changed.')
   },
 
   async forgetAll() {
     const rows = check(await supabase().from('memories').select('id').is('forgotten_at', null)) as { id: string }[]
-    for (const r of rows) await supabaseAdapter.forget(r.id)
+    let done = 0
+    for (const r of rows) {
+      try { await supabaseAdapter.forget(r.id); done++ } catch (e) {
+        throw new Error(`Forgot ${done} of ${rows.length} memories; the others were not changed. ${(e as Error).message}`)
+      }
+    }
     return rows.length
   },
 }

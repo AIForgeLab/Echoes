@@ -92,3 +92,27 @@ begin
     execute format('create policy own_rows on %I for all using (user_id = auth.uid()) with check (user_id = auth.uid())', t);
   end loop;
 end $$;
+
+-- Forgetting runs as ONE transaction: every step happens or none does, and retrying is harmless.
+-- SECURITY INVOKER means it runs as the signed-in user, so Row Level Security still applies.
+create or replace function forget_memory(p_memory uuid) returns void
+language plpgsql security invoker set search_path = public as $$
+declare v_chain text;
+begin
+  if exists (select 1 from tombstones where memory_id = p_memory) then
+    return;  -- already forgotten
+  end if;
+  select chain_hash into v_chain from versions where memory_id = p_memory order by version_no desc limit 1;
+  if v_chain is null then
+    raise exception 'This memory does not exist in your archive.' using errcode = 'P0002';
+  end if;
+  delete from claims where memory_id = p_memory;
+  delete from tags where memory_id = p_memory;
+  delete from memory_keys where memory_id = p_memory;  -- crypto-shredding: the text can never be decrypted again
+  update versions set content_hash = null where memory_id = p_memory;
+  update memories set title = null, summary = null, cover = null, favourite = false, forgotten_at = now(), updated_at = now()
+    where id = p_memory;
+  insert into tombstones (memory_id, chain_hash) values (p_memory, v_chain);
+end $$;
+revoke all on function forget_memory(uuid) from public, anon;
+grant execute on function forget_memory(uuid) to authenticated;

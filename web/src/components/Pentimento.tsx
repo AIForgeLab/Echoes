@@ -57,6 +57,7 @@ export default function Pentimento({ echo, onClaimsSaved }: { echo: EchoDetail; 
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted">In painting, a <em>pentimento</em> is an earlier version hidden under later paint, revealed by X-ray. Every time you remember, you repaint.</p>
+      <p className="text-xs text-muted">A comparison aid, not a verdict: facts are paired by their wording, then an AI labels each pair. Read both tellings before drawing conclusions.</p>
       <div className="flex flex-wrap items-center gap-2">
         {pick(a, setA, 'Earlier telling')}<span className="text-muted text-sm">underneath</span>{pick(b, setB, 'Later telling')}
         <button className="btn-primary" onClick={run} disabled={busy || a === b}>{busy ? <Loader2 size={16} className="animate-spin" /> : <ScanSearch size={16} />}X-ray</button>

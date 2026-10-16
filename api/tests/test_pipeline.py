@@ -114,3 +114,22 @@ def test_local_vectors_pair_the_robot_retelling():
     assert ("changed", "Your father helped you build it", "Dad and Uncle Raj helped you build it") in pairs  # dad = father
     assert ("omitted", "It was raining", None) in pairs
     assert ("new", None, "You won the competition") in pairs
+
+
+def test_local_vectors_pair_a_single_shared_word():
+    """The sample circuit retelling: one shared word ('bulb', 'engineer') must still reach the judge."""
+    from pipeline import LEXICAL_THRESHOLD
+    old = ["You were fourteen", "You assembled a small battery-powered circuit", "It was for a school science exhibition",
+           "The bulb flickered several times before it stayed on", "You felt you had made something real with your own hands",
+           "The experience strengthened your interest in electrical engineering"]
+    new = ["You were thirteen or fourteen", "Your science teacher helped you", "You wired up a circuit", "It was for the school exhibition",
+           "The bulb lit up on the first try", "The judges gave you second prize", "That was the day you decided to become an engineer"]
+
+    def judge(pairs):
+        return {p["id"]: "changed" for p in pairs}
+
+    pairs = {(r["label"], r["old"], r["new"]) for r in align_claims(old, new, lexical_vectors, judge, threshold=LEXICAL_THRESHOLD)}
+    assert ("changed", old[3], new[4]) in pairs
+    assert ("changed", old[5], new[6]) in pairs
+    assert ("omitted", old[4], None) in pairs
+    assert ("new", None, new[5]) in pairs

@@ -31,3 +31,19 @@ export async function decrypt(keyB64: string | null | undefined, ciphertext: str
     return null
   }
 }
+
+// Smaller fields (facts, quotes, summaries) are stored as one string: "enc:v1:<iv>:<ciphertext>".
+const FIELD = 'enc:v1:'
+
+export async function sealField(keyB64: string, text: string): Promise<string> {
+  const { ciphertext, iv } = await encrypt(keyB64, text)
+  return `${FIELD}${iv}:${ciphertext}`
+}
+
+/** Decrypts a sealed field. Values saved before field encryption existed are returned as they are. */
+export async function openField(keyB64: string | null | undefined, value: string | null): Promise<string | null> {
+  if (value == null || !value.startsWith(FIELD)) return value
+  const rest = value.slice(FIELD.length)
+  const cut = rest.indexOf(':')
+  return cut < 0 ? null : decrypt(keyB64, rest.slice(cut + 1), rest.slice(0, cut))
+}

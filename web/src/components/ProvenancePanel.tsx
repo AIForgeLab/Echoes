@@ -5,6 +5,8 @@ import type { SealCheck } from '../lib/seal'
 import { portraitUri } from '../lib/portrait'
 import { formatDateTime, shortHash } from '../lib/format'
 import { bundleOf, downloadJson } from '../lib/exportBundle'
+import { contentHash } from '../lib/seal'
+import { tamperText } from '../services/adapter'
 import { data } from '../services/data'
 import { useToast } from './Toast'
 import ConfirmDialog from './ConfirmDialog'
@@ -12,6 +14,8 @@ import ConfirmDialog from './ConfirmDialog'
 export default function ProvenancePanel({ echo, seal, onChanged }: { echo: EchoDetail; seal: SealCheck[]; onChanged: () => void }) {
   const toast = useToast()
   const [tamperOpen, setTamperOpen] = useState(false)
+  const live = data.mode === 'live'
+  const [sim, setSim] = useState<{ word: string; hash: string } | null>(null)
   const latest = echo.tellings.at(-1)
   const latestSeal = seal.find((s) => s.versionNo === latest?.versionNo)
   const allOk = seal.length > 0 && seal.every((s) => s.ok)
@@ -28,6 +32,12 @@ export default function ProvenancePanel({ echo, seal, onChanged }: { echo: EchoD
             <img src={portraitUri(echo.forgottenAt ? null : latest?.contentHash ?? null, echo.style)} alt="Seal portrait generated from the stored hash" className="size-32 rounded-xl border border-bronze/60" />
             <figcaption className="text-xs text-muted mt-1">Sealed portrait</figcaption>
           </figure>
+          {sim && (
+            <figure className="text-center">
+              <img src={portraitUri(sim.hash, echo.style)} alt="Portrait generated from the simulated, altered text" className="size-32 rounded-xl border border-danger/70" />
+              <figcaption className="text-xs text-danger mt-1">If one word changed</figcaption>
+            </figure>
+          )}
           {latestSeal && !latestSeal.ok && latestSeal.recomputedHash && (
             <figure className="text-center">
               <img src={portraitUri(latestSeal.recomputedHash, echo.style)} alt="Portrait generated from the text as it is now" className="size-32 rounded-xl border border-danger/70" />
@@ -52,6 +62,14 @@ export default function ProvenancePanel({ echo, seal, onChanged }: { echo: EchoD
           <p className="text-xs text-muted">A hash shows whether this exact text changed. It cannot show whether the memory itself is true.</p>
         </div>
       </div>
+
+      {sim && (
+        <div role="status" className="card border-danger/50 bg-danger/5 p-4 text-sm space-y-1">
+          <p className="text-danger font-medium">Simulation: one word changed to “{sim.word}”</p>
+          <p>The altered copy hashes to <code className="text-muted">{shortHash(sim.hash)}</code>, but the seal says <code className="text-muted">{shortHash(latest?.contentHash)}</code>. Echoes would flag this telling as changed.</p>
+          <p className="text-xs text-muted">Nothing was saved: the stored memory is untouched. <button className="text-gold hover:underline" onClick={() => setSim(null)}>Clear</button></p>
+        </div>
+      )}
 
       <div>
         <h3 className="font-serif text-xl mb-2">Seal chain</h3>
@@ -87,17 +105,30 @@ export default function ProvenancePanel({ echo, seal, onChanged }: { echo: EchoD
         {!echo.forgottenAt && latest?.text && <button className="btn-ghost" onClick={() => setTamperOpen(true)}><ShieldAlert size={16} />Simulate tampering (demo)</button>}
       </div>
 
-      <ConfirmDialog open={tamperOpen} title="Simulate tampering?" confirmLabel="Change one word" danger onClose={() => setTamperOpen(false)}
+      <ConfirmDialog open={tamperOpen} title="Simulate tampering?" confirmLabel={live ? 'Run the simulation' : 'Change one word'} danger={!live} onClose={() => setTamperOpen(false)}
         onConfirm={async () => {
           try {
+            if (live) {
+              // Never write to a real memory: change a copy in the browser and compare hashes.
+              const { text, word } = tamperText(latest!.text!)
+              setSim({ word, hash: await contentHash(text) })
+              setTamperOpen(false)
+              return
+            }
             const word = await data.tamper(echo.id, latest!.versionNo)
             toast('info', `One word was secretly changed to “${word}”. Watch the seal.`)
             setTamperOpen(false)
             onChanged()
           } catch (e) { toast('error', (e as Error).message) }
         }}>
-        <p>This acts like someone with database access: it re-encrypts the latest telling with one word changed, without updating its seal. Use it to show that Echoes detects the change.</p>
-        <p>It permanently alters this memory's stored text. Use it on sample memories.</p>
+        {live ? (
+          <p>Echoes changes one word in a copy of the latest telling, in your browser only, and checks it against the seal. Your stored memory is not changed.</p>
+        ) : (
+          <>
+            <p>This acts like someone with access to the stored data: it re-encrypts the latest telling with one word changed, without updating its seal.</p>
+            <p>In demo mode it alters the copy kept in this browser. Reset demo data in Settings to undo it.</p>
+          </>
+        )}
       </ConfirmDialog>
     </div>
   )
