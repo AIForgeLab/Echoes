@@ -39,6 +39,16 @@ function Feedback({ error, info }: { error?: string; info?: string }) {
   return null
 }
 
+/** Turn provider errors into something a person can act on. */
+export function friendlyAuthError(msg: string): string {
+  if (/invalid login credentials/i.test(msg))
+    return 'That email and password don\'t match an account. Check for typos (passwords are case-sensitive), make sure you\'re using the email you signed up with, or reset your password.'
+  if (/email not confirmed/i.test(msg)) return 'Please confirm your email first. Check your inbox for the link.'
+  if (/rate limit|too many/i.test(msg)) return 'Too many attempts. Wait a minute, then try again.'
+  if (/failed to fetch|network/i.test(msg)) return 'Can\'t reach the sign-in service. Check your internet connection.'
+  return msg
+}
+
 export function passwordProblems(pw: string): string[] {
   const p: string[] = []
   if (pw.length < 8) p.push('at least 8 characters')
@@ -61,7 +71,7 @@ export function Login() {
       await data.auth.signIn(email.trim(), pw)
       nav(loc.state?.from || '/dashboard', { replace: true })
     } catch (err) {
-      setError((err as Error).message)
+      setError(friendlyAuthError((err as Error).message))
       setBusy(false)
     }
   }

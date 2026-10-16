@@ -75,7 +75,7 @@ export default function Settings() {
         <ul className="text-sm text-muted space-y-1.5 list-disc pl-5">
           <li>Each memory is encrypted in your browser with its own key before it is stored.</li>
           <li>Memories are private to your account. Nothing is shared publicly.</li>
-          <li>When you use an AI feature, only that memory's text (and its other tellings, for the assumption check) is sent to the Echoes AI server, which forwards it to Google Gemini. Your other memories are never sent.</li>
+          <li>When you use an AI feature, only that memory's text (and its other tellings, for the assumption check) is sent to the Echoes AI server, which forwards it to an AI model hosted by Groq. Your other memories are never sent. During the demo, use fictional memories: free API tiers are meant for testing, not personal data.</li>
           <li>Generated summaries are always stored and shown separately from your own words.</li>
         </ul>
         <div className="flex items-center justify-between gap-4 rounded-xl border border-bronze/40 bg-surface-2 p-4 text-sm">
@@ -120,7 +120,7 @@ export default function Settings() {
         <p className="text-ivory">Echoes — The Living Memory Archive <span className="text-muted">· v{APP_VERSION}</span> {data.mode === 'demo' && <DemoLabel>Demo mode</DemoLabel>}</p>
         <p className="text-sm text-muted italic">Preserve the memory. Question the meaning. Verify the truth. Respect the right to forget.</p>
         <p className="text-sm text-muted"><strong className="text-ivory">The Truth Boundary:</strong> every AI answer is split into what you actually wrote (source-backed, with the exact quote checked in code), what the AI infers (interpretation), and what your memory doesn't say (unknown). Leading questions are checked against your words before anything is answered.</p>
-        <p className="text-xs text-muted">Built with React, Vite, Tailwind CSS, React Router, React Flow (@xyflow/react), Lucide icons, Supabase, Flask and Google Gemini. Seal portraits follow Perrig &amp; Song's hash visualization (1999). Theatre view after Giulio Camillo's Theatre of Memory.</p>
+        <p className="text-xs text-muted">Built with React, Vite, Tailwind CSS, React Router, React Flow (@xyflow/react), Lucide icons, Supabase, Flask and Groq. Seal portraits follow Perrig &amp; Song's hash visualization (1999). Theatre view after Giulio Camillo's Theatre of Memory.</p>
       </Section>
 
       <ConfirmDialog open={clearOpen} title="Forget every memory?" confirmLabel="Forget everything" danger typeToConfirm="forget" onClose={() => setClearOpen(false)}

@@ -34,7 +34,7 @@ cd api
 python -m venv .venv && .venv\Scripts\activate      # Windows   (macOS/Linux: source .venv/bin/activate)
 pip install -r requirements.txt
 copy .env.example .env                                  # macOS/Linux: cp .env.example .env
-# put your Gemini key in api/.env
+# put your Groq API key (free at console.groq.com) in api/.env
 python app.py                                           # http://localhost:5001
 ```
 
@@ -74,7 +74,7 @@ web/  React 19 + TypeScript + Vite + Tailwind CSS 4 + React Router + React Flow 
   src/lib/seal.ts                 canonical text, SHA-256, chain verification
   src/lib/vault.ts                per-memory AES-GCM (Web Crypto)
   src/lib/portrait.ts             hash-seeded portraits in 5 styles
-api/  Flask + Google Gemini (the only place the AI key lives)
+api/  Flask + Groq (gpt-oss-120b), OpenAI-compatible (the only place the AI key lives)
   core.py      canonicalize, exact-quote spans, Hungarian claim alignment
   pipeline.py  extract / guard / answer + entailment check / pentimento
 supabase/schema.sql   tables + Row Level Security
@@ -104,6 +104,6 @@ runs a second entailment check, and the browser re-checks the quote again before
 ## Credits
 
 React, Vite, Tailwind CSS, React Router, React Flow (@xyflow/react), Lucide, Supabase, Flask,
-Google Gemini, NumPy/SciPy. Hash portraits follow Perrig & Song, *Hash Visualization* (1999).
+Groq (gpt-oss-120b), NumPy/SciPy. Hash portraits follow Perrig & Song, *Hash Visualization* (1999).
 Research: Chan et al., *Conversational AI … Amplifies False Memories* (2024); Min et al., *FActScore* (2023);
 Yu et al., *CREPE* (2023); Wardell et al., autobiographical memory consistency (2025).

@@ -1,7 +1,8 @@
 """The Echoes pipelines. `gen` is a function (system, prompt) -> dict, so tests can pass a fake."""
 import json
+import re
 
-from core import align_claims, canonicalize, find_span
+from core import _tokens, align_claims, canonicalize, find_span, lexical_vectors
 
 CATEGORIES = ["Personal", "Learning", "Projects", "Travel", "People", "Ideas"]
 
@@ -35,15 +36,20 @@ def extract(text, gen):
 
 # ---------------------------------------------------------------- guard
 GUARD_SYSTEM = """You check the hidden assumptions (presuppositions) of a question about a memory.
-An assumption is something the question takes for granted, NOT what it asks.
-Example: "Was Dad proud when the robot won the competition?" assumes "the robot won a competition"
-and "Dad was there"; it ASKS whether Dad was proud (that is not an assumption).
+An assumption is something the question TAKES FOR GRANTED in order to make sense. It is NOT the thing being asked.
+Examples:
+- "Was Dad proud when the robot won the competition?" takes for granted "the robot won a competition".
+  It ASKS whether Dad was proud, so "Dad was proud" is NOT an assumption.
+- "Was my father an engineer?" takes nothing for granted beyond having a father. It ASKS whether he was an
+  engineer, so "my father was an engineer" is NOT an assumption.
+- "Why was this moment important?" takes for granted that the moment mattered; that is fine if the memory supports it.
 Return JSON: {"assumptions": [{"assumption": "...",
   "status": "supported" | "not_mentioned" | "contradicted",
   "quote": "exact substring of the MEMORY that supports or contradicts it, or empty",
   "other_label": "label of an OTHER TELLING that states it, or empty",
   "other_quote": "exact substring of that other telling, or empty"}]}
-Only list assumptions that are about facts of the memory. If the question assumes nothing, return [].
+Use "contradicted" only when the memory says the opposite; if it simply doesn't say, use "not_mentioned".
+List at most 3 assumptions, only facts about the memory. If the question assumes nothing notable, return [].
 Quotes must be copied character-for-character."""
 
 
@@ -61,12 +67,30 @@ def guard(text, question, others, gen):
                 "quote": text[span[0]:span[1]] if span else None,
                 "start": span[0] if span else None, "end": span[1] if span else None,
                 "found_in": None}
-        if status == "not_mentioned" and a.get("other_label"):
-            match = next((o for o in others if o["label"] == a["other_label"]), None)
-            if match and find_span(match["text"], a.get("other_quote", "")):
-                item["found_in"] = {"label": match["label"], "quote": a["other_quote"]}
+        if status == "not_mentioned":
+            item["found_in"] = _find_in_others(a, text, others)
         checked.append(item)
     return checked
+
+
+def _find_in_others(a, text, others):
+    """Does another telling state this assumption? Trust the model's pointer only if its quote is real;
+    otherwise search in code for a sentence sharing the assumption's key words that this telling lacks."""
+    for o in others:
+        if a.get("other_quote") and find_span(o["text"], a["other_quote"]):
+            span = find_span(o["text"], a["other_quote"])
+            return {"label": o["label"], "quote": canonicalize(o["text"])[span[0]:span[1]]}
+    here = set(_tokens(text))
+    key = [w for w in _tokens(a.get("assumption", "")) if w not in here]
+    if not key:
+        return None
+    best = None
+    for o in others:
+        for sentence in re.split(r"(?<=[.!?])\s+", canonicalize(o["text"])):
+            hits = len(set(key) & set(_tokens(sentence)))
+            if hits and (best is None or hits > best[0]):
+                best = (hits, o["label"], sentence)
+    return {"label": best[1], "quote": best[2]} if best else None
 
 
 # ---------------------------------------------------------------- answer
@@ -121,8 +145,12 @@ Label each pair:
 Return JSON: {"results": [{"id": <id>, "label": "consistent" | "changed" | "unrelated"}]}"""
 
 
-def pentimento(old_claims, new_claims, gen, emb):
+def pentimento(old_claims, new_claims, gen, emb=None):
+    """Pair claims (Hungarian matching on vector similarity), then let the model judge each pair.
+    emb=None uses local TF-IDF vectors, so no embedding API is needed."""
     def judge(pairs):
         out = gen(JUDGE_SYSTEM, json.dumps(pairs))
         return {r.get("id"): r.get("label") for r in out.get("results", [])}
+    if emb is None:
+        return align_claims(old_claims, new_claims, lexical_vectors, judge, threshold=0.2)
     return align_claims(old_claims, new_claims, emb, judge)

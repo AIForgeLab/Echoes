@@ -21,3 +21,6 @@ Thumbs.db
 # exports may contain real memories
 echoes-archive-*.json
 echo-*.json
+
+# local model benchmarks
+api/_bench/

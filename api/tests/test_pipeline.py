@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from core import align_claims, canonicalize, find_span  # noqa: E402
+from core import align_claims, canonicalize, find_span, lexical_vectors  # noqa: E402
 import pipeline  # noqa: E402
 
 MEMORY = ("When I was ten, I built my first robot with my father.  It was raining, "
@@ -98,3 +98,19 @@ def test_align_labels_consistent_changed_omitted_new():
     assert ("changed", "Your father helped you", "Dad and Uncle Raj helped you") in labels
     assert ("omitted", "It was raining", None) in labels
     assert ("new", None, "You entered a school competition") in labels
+
+
+def test_local_vectors_pair_the_robot_retelling():
+    old = ["You were ten", "You built your first robot", "Your father helped you build it", "It was raining",
+           "You worked in the garage", "That day inspired you to become an engineer"]
+    new = ["You were ten", "You built a robot", "Dad and Uncle Raj helped you build it", "The robot was for a school competition",
+           "You won the competition", "That was when you knew you wanted to be an engineer"]
+
+    def judge(pairs):
+        return {p["id"]: ("consistent" if p["old"] == p["new"] else "changed") for p in pairs}
+
+    out = align_claims(old, new, lexical_vectors, judge, threshold=0.2)
+    pairs = {(r["label"], r["old"], r["new"]) for r in out}
+    assert ("changed", "Your father helped you build it", "Dad and Uncle Raj helped you build it") in pairs  # dad = father
+    assert ("omitted", "It was raining", None) in pairs
+    assert ("new", None, "You won the competition") in pairs

@@ -3,7 +3,9 @@
 - canonicalize(): the exact same text normalisation the browser uses before hashing
 - find_span():    code (not the model) decides whether a quote really is in the memory
 - align_claims(): Pentimento - pair claims across two tellings, then label them
+- lexical_vectors(): local TF-IDF vectors, so Pentimento needs no embedding API
 """
+import math
 import re
 import unicodedata
 
@@ -47,6 +49,53 @@ def find_span(text: str, quote: str):
     return None
 
 
+_SYNONYMS = {"dad": "father", "daddy": "father", "papa": "father", "mom": "mother", "mum": "mother", "mama": "mother",
+             "built": "build", "building": "build", "builds": "build", "wanted": "want", "wants": "want", "knew": "know",
+             "won": "win", "winning": "win", "kid": "child"}
+_STOP = set("""a an the and or but so of to in on at for with from by as is was were be been am are it its this that
+these those i me my we our you your he she his her they them their there here what which who whom when where why how
+did do does had has have not no yes than then too very can could would should will just about into over after before
+because while if also only up down out off again once that's""".split())
+
+
+def _tokens(text: str):
+    out = []
+    for w in re.findall(r"[a-z']+", (text or "").lower()):
+        w = w.strip("'")
+        w = _SYNONYMS.get(w, w)
+        if len(w) > 4 and w.endswith("ing"):
+            w = w[:-3]
+        elif len(w) > 4 and w.endswith("ed"):
+            w = w[:-2]
+        elif len(w) > 3 and w.endswith("s") and not w.endswith("ss"):
+            w = w[:-1]
+        w = _SYNONYMS.get(w, w)
+        if len(w) > 1 and w not in _STOP:
+            out.append(w)
+    return out
+
+
+def lexical_vectors(texts):
+    """TF-IDF vectors over word stems (with a few synonyms such as dad=father). No network needed."""
+    docs = [_tokens(t) for t in texts]
+    vocab = sorted({w for d in docs for w in d})
+    if not vocab:
+        return [[0.0] for _ in texts]
+    index = {w: i for i, w in enumerate(vocab)}
+    df = {w: sum(1 for d in docs if w in d) for w in vocab}
+    n = len(docs)
+    vecs = []
+    for d in docs:
+        v = [0.0] * len(vocab)
+        for w in d:
+            v[index[w]] += 1.0
+        for w, i in index.items():
+            if v[i]:
+                v[i] *= math.log((1 + n) / (1 + df[w])) + 1.0
+        vecs.append(v)
+    return vecs
+
+
 def cosine_matrix(a, b):
     a = np.asarray(a, dtype=float)
     b = np.asarray(b, dtype=float)
@@ -66,6 +115,7 @@ def align_claims(old, new, embed_fn, judge_fn, threshold=0.6):
     2. Hungarian algorithm = best one-to-one pairing of old and new claims
     3. drop weak pairs (< threshold), ask the judge about the rest
     4. anything unpaired is 'omitted' (only in old) or 'new' (only in new)
+    With lexical_vectors use a lower threshold (about 0.2) than with neural embeddings.
     """
     result = []
     paired_old, paired_new = set(), set()

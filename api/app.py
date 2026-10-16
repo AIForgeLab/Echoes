@@ -64,7 +64,8 @@ def align():
     if (err := require_user()):
         return err
     body = request.get_json(force=True)
-    return {"pairs": pipeline.pentimento(body["old"], body["new"], llm.generate_json, llm.embed)}
+    emb = llm.embed if os.environ.get("EMBED_API_KEY") else None  # None = built-in local similarity
+    return {"pairs": pipeline.pentimento(body["old"], body["new"], llm.generate_json, emb)}
 
 
 if __name__ == "__main__":

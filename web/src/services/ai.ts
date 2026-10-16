@@ -1,4 +1,4 @@
-// AI calls. Live = the Echoes API server (api/app.py), which holds the Gemini key.
+// AI calls. Live = the Echoes API server (api/app.py), which holds the AI provider key (Groq).
 // When that server isn't configured or reachable, a clearly labelled offline demo is used instead.
 // A request that fails on a reachable live server is reported as an error, never faked.
 import { API_URL, DEMO_MODE } from '../config'
